@@ -19,6 +19,10 @@ import {
   MessageSquare,
   Trash2,
   ShieldAlert,
+  Mic,
+  MicOff,
+  Volume2,
+  Square,
 } from "lucide-react";
 
 type Subject = "math" | "science" | "english" | "history" | "general";
@@ -50,7 +54,41 @@ function ChatPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [displayName, setDisplayName] = useState<string>("");
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const speechSupported =
+    typeof window !== "undefined" &&
+    !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+
+  function toggleListening() {
+    if (!speechSupported) {
+      toast.error("Voice input isn't supported in this browser.");
+      return;
+    }
+    if (listening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const rec = new SR();
+    rec.continuous = false;
+    rec.interimResults = true;
+    rec.lang = navigator.language || "en-US";
+    let base = input;
+    rec.onstart = () => setListening(true);
+    rec.onend = () => setListening(false);
+    rec.onerror = () => setListening(false);
+    rec.onresult = (e: any) => {
+      let transcript = "";
+      for (let i = 0; i < e.results.length; i++) transcript += e.results[i][0].transcript;
+      setInput((base ? base + " " : "") + transcript);
+    };
+    recognitionRef.current = rec;
+    rec.start();
+  }
+
 
   // load profile + conversations
   useEffect(() => {
@@ -335,6 +373,18 @@ function ChatPage() {
                 maxLength={4000}
                 className="min-h-[44px] max-h-40 resize-none border-0 bg-transparent focus-visible:ring-0"
               />
+              {speechSupported && (
+                <Button
+                  onClick={toggleListening}
+                  disabled={loading}
+                  size="icon"
+                  variant={listening ? "destructive" : "secondary"}
+                  className="h-10 w-10 shrink-0 rounded-xl"
+                  title={listening ? "Stop dictation" : "Voice input"}
+                >
+                  {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                </Button>
+              )}
               <Button
                 onClick={send}
                 disabled={loading || !input.trim()}
@@ -358,16 +408,49 @@ function ChatPage() {
 
 function Bubble({ role, content }: { role: "user" | "assistant"; content: string }) {
   const isUser = role === "user";
+  const [speaking, setSpeaking] = useState(false);
+  const ttsSupported = typeof window !== "undefined" && "speechSynthesis" in window;
+
+  function toggleSpeak() {
+    if (!ttsSupported) return;
+    if (speaking) {
+      window.speechSynthesis.cancel();
+      setSpeaking(false);
+      return;
+    }
+    const clean = content
+      .replace(/```[\s\S]*?```/g, " ")
+      .replace(/[`*_#>~]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    const u = new SpeechSynthesisUtterance(clean);
+    u.onend = () => setSpeaking(false);
+    u.onerror = () => setSpeaking(false);
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(u);
+    setSpeaking(true);
+  }
+
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-[var(--shadow-card)] ${
+        className={`group max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-[var(--shadow-card)] ${
           isUser
             ? "bg-gradient-to-br from-primary/90 to-accent/80 text-primary-foreground"
             : "glass"
         }`}
       >
         <FormattedContent text={content} />
+        {!isUser && ttsSupported && (
+          <button
+            onClick={toggleSpeak}
+            className="mt-2 inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+            title={speaking ? "Stop" : "Read aloud"}
+          >
+            {speaking ? <Square className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
+            {speaking ? "Stop" : "Listen"}
+          </button>
+        )}
       </div>
     </div>
   );
