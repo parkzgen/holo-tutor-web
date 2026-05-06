@@ -19,6 +19,10 @@ import {
   MessageSquare,
   Trash2,
   ShieldAlert,
+  Mic,
+  MicOff,
+  Volume2,
+  Square,
 } from "lucide-react";
 
 type Subject = "math" | "science" | "english" | "history" | "general";
