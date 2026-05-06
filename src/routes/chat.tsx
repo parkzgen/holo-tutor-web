@@ -373,6 +373,18 @@ function ChatPage() {
                 maxLength={4000}
                 className="min-h-[44px] max-h-40 resize-none border-0 bg-transparent focus-visible:ring-0"
               />
+              {speechSupported && (
+                <Button
+                  onClick={toggleListening}
+                  disabled={loading}
+                  size="icon"
+                  variant={listening ? "destructive" : "secondary"}
+                  className="h-10 w-10 shrink-0 rounded-xl"
+                  title={listening ? "Stop dictation" : "Voice input"}
+                >
+                  {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                </Button>
+              )}
               <Button
                 onClick={send}
                 disabled={loading || !input.trim()}
