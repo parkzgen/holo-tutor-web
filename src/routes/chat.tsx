@@ -1,11 +1,12 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { askHomework } from "@/server/chat.functions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
+import katex from "katex";
 import {
   Sparkles,
   Plus,
@@ -23,6 +24,8 @@ import {
   MicOff,
   Volume2,
   Square,
+  Headphones,
+  PhoneOff,
 } from "lucide-react";
 
 type Subject = "math" | "science" | "english" | "history" | "general";
@@ -55,12 +58,58 @@ function ChatPage() {
   const [loading, setLoading] = useState(false);
   const [displayName, setDisplayName] = useState<string>("");
   const [listening, setListening] = useState(false);
+  const [convoMode, setConvoMode] = useState(false);
+  const [speakingId, setSpeakingId] = useState<number | null>(null);
   const recognitionRef = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const sendRef = useRef<(text?: string) => Promise<void>>(() => Promise.resolve());
+  const convoModeRef = useRef(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [ttsSupported, setTtsSupported] = useState(false);
 
-  const speechSupported =
-    typeof window !== "undefined" &&
-    !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+  useEffect(() => {
+    setSpeechSupported(
+      !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition),
+    );
+    setTtsSupported("speechSynthesis" in window);
+  }, []);
+
+  useEffect(() => {
+    convoModeRef.current = convoMode;
+  }, [convoMode]);
+
+  const startListening = useCallback((autoSend: boolean) => {
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) return;
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch {}
+    }
+    const rec = new SR();
+    rec.continuous = false;
+    rec.interimResults = true;
+    rec.lang = navigator.language || "en-US";
+    let finalText = "";
+    rec.onstart = () => setListening(true);
+    rec.onend = () => {
+      setListening(false);
+      if (autoSend && finalText.trim()) {
+        sendRef.current(finalText.trim());
+      }
+    };
+    rec.onerror = () => setListening(false);
+    rec.onresult = (e: any) => {
+      let interim = "";
+      finalText = "";
+      for (let i = 0; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) finalText += t;
+        else interim += t;
+      }
+      setInput((finalText + interim).trim());
+    };
+    recognitionRef.current = rec;
+    rec.start();
+  }, []);
 
   function toggleListening() {
     if (!speechSupported) {
@@ -71,22 +120,36 @@ function ChatPage() {
       recognitionRef.current?.stop();
       return;
     }
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    const rec = new SR();
-    rec.continuous = false;
-    rec.interimResults = true;
-    rec.lang = navigator.language || "en-US";
-    let base = input;
-    rec.onstart = () => setListening(true);
-    rec.onend = () => setListening(false);
-    rec.onerror = () => setListening(false);
-    rec.onresult = (e: any) => {
-      let transcript = "";
-      for (let i = 0; i < e.results.length; i++) transcript += e.results[i][0].transcript;
-      setInput((base ? base + " " : "") + transcript);
-    };
-    recognitionRef.current = rec;
-    rec.start();
+    startListening(false);
+  }
+
+  function toggleConvoMode() {
+    if (!speechSupported || !ttsSupported) {
+      toast.error("Voice conversation isn't supported in this browser.");
+      return;
+    }
+    if (convoMode) {
+      setConvoMode(false);
+      try { recognitionRef.current?.stop(); } catch {}
+      window.speechSynthesis.cancel();
+      setSpeakingId(null);
+      return;
+    }
+    setConvoMode(true);
+    toast.success("Conversation mode on — speak when ready.");
+    startListening(true);
+  }
+
+  function speakAssistant(text: string, onDone?: () => void) {
+    if (!ttsSupported) { onDone?.(); return; }
+    const clean = stripForSpeech(text);
+    const u = new SpeechSynthesisUtterance(clean);
+    const id = Date.now();
+    setSpeakingId(id);
+    u.onend = () => { setSpeakingId(null); onDone?.(); };
+    u.onerror = () => { setSpeakingId(null); onDone?.(); };
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(u);
   }
 
 
@@ -164,8 +227,8 @@ function ChatPage() {
     navigate({ to: "/" });
   }
 
-  async function send() {
-    const text = input.trim();
+  async function send(overrideText?: string) {
+    const text = (overrideText ?? input).trim();
     if (!text || loading) return;
 
     const { data: u } = await supabase.auth.getUser();
@@ -179,7 +242,6 @@ function ChatPage() {
 
     let convoId = activeId;
     try {
-      // create conversation if needed
       if (!convoId) {
         const title = text.slice(0, 60);
         const { data, error } = await supabase
@@ -196,7 +258,6 @@ function ChatPage() {
       const nextMessages = [...messages, userMsg];
       setMessages(nextMessages);
 
-      // persist user message
       await supabase.from("messages").insert({
         conversation_id: convoId,
         user_id: u.user.id,
@@ -204,7 +265,6 @@ function ChatPage() {
         content: text,
       });
 
-      // call AI
       const { data: sess } = await supabase.auth.getSession();
       const token = sess.session?.access_token;
       const result = await askHomework({
@@ -236,12 +296,36 @@ function ChatPage() {
         .eq("id", convoId);
 
       await loadConversations();
+
+      // In conversation mode: auto-speak reply, then re-listen
+      if (convoModeRef.current) {
+        speakAssistant(result.content, () => {
+          if (convoModeRef.current) startListening(true);
+        });
+      }
     } catch (err) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Failed to send");
     } finally {
       setLoading(false);
     }
+  }
+
+  useEffect(() => {
+    sendRef.current = send;
+  });
+
+  function stripForSpeech(s: string) {
+    return s
+      .replace(/```[\s\S]*?```/g, " ")
+      .replace(/\$\$([\s\S]+?)\$\$/g, " $1 ")
+      .replace(/\$([^$\n]+?)\$/g, " $1 ")
+      .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, "$1 over $2")
+      .replace(/\\sqrt\{([^}]+)\}/g, "square root of $1")
+      .replace(/\\[a-zA-Z]+/g, " ")
+      .replace(/[`*_#>~{}\\^]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
   }
 
   return (
@@ -388,8 +472,19 @@ function ChatPage() {
                   {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                 </Button>
               )}
+              {speechSupported && ttsSupported && (
+                <Button
+                  onClick={toggleConvoMode}
+                  size="icon"
+                  variant={convoMode ? "destructive" : "secondary"}
+                  className="h-10 w-10 shrink-0 rounded-xl"
+                  title={convoMode ? "End voice conversation" : "Start voice conversation"}
+                >
+                  {convoMode ? <PhoneOff className="h-4 w-4" /> : <Headphones className="h-4 w-4" />}
+                </Button>
+              )}
               <Button
-                onClick={send}
+                onClick={() => send()}
                 disabled={loading || !input.trim()}
                 size="icon"
                 className="h-10 w-10 shrink-0 rounded-xl glow"
@@ -500,9 +595,36 @@ function FormattedContent({ text }: { text: string }) {
   );
 }
 
+function renderMath(src: string, displayMode: boolean, key: string | number) {
+  try {
+    const html = katex.renderToString(src, {
+      displayMode,
+      throwOnError: false,
+      output: "html",
+    });
+    return (
+      <span
+        key={key}
+        className={displayMode ? "block my-2 overflow-x-auto" : ""}
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+    );
+  } catch {
+    return <span key={key}>{src}</span>;
+  }
+}
+
 function renderInline(s: string): React.ReactNode {
-  const parts = s.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+  // Split on $$...$$, \[...\], $...$, \(...\), **bold**, `code`
+  const regex =
+    /(\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)|\$[^$\n]+?\$|\*\*[^*]+\*\*|`[^`]+`)/g;
+  const parts = s.split(regex);
   return parts.map((p, i) => {
+    if (!p) return null;
+    if (/^\$\$[\s\S]+\$\$$/.test(p)) return renderMath(p.slice(2, -2), true, i);
+    if (/^\\\[[\s\S]+\\\]$/.test(p)) return renderMath(p.slice(2, -2), true, i);
+    if (/^\\\([\s\S]+\\\)$/.test(p)) return renderMath(p.slice(2, -2), false, i);
+    if (/^\$[^$\n]+\$$/.test(p)) return renderMath(p.slice(1, -1), false, i);
     if (/^\*\*.+\*\*$/.test(p))
       return (
         <strong key={i} className="font-semibold">
