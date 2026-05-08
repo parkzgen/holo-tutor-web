@@ -472,6 +472,17 @@ function ChatPage() {
                   {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                 </Button>
               )}
+              {speechSupported && ttsSupported && (
+                <Button
+                  onClick={toggleConvoMode}
+                  size="icon"
+                  variant={convoMode ? "destructive" : "secondary"}
+                  className="h-10 w-10 shrink-0 rounded-xl"
+                  title={convoMode ? "End voice conversation" : "Start voice conversation"}
+                >
+                  {convoMode ? <PhoneOff className="h-4 w-4" /> : <Headphones className="h-4 w-4" />}
+                </Button>
+              )}
               <Button
                 onClick={() => send()}
                 disabled={loading || !input.trim()}
