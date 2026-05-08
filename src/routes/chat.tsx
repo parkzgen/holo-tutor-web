@@ -595,9 +595,36 @@ function FormattedContent({ text }: { text: string }) {
   );
 }
 
+function renderMath(src: string, displayMode: boolean, key: string | number) {
+  try {
+    const html = katex.renderToString(src, {
+      displayMode,
+      throwOnError: false,
+      output: "html",
+    });
+    return (
+      <span
+        key={key}
+        className={displayMode ? "block my-2 overflow-x-auto" : ""}
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+    );
+  } catch {
+    return <span key={key}>{src}</span>;
+  }
+}
+
 function renderInline(s: string): React.ReactNode {
-  const parts = s.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+  // Split on $$...$$, \[...\], $...$, \(...\), **bold**, `code`
+  const regex =
+    /(\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)|\$[^$\n]+?\$|\*\*[^*]+\*\*|`[^`]+`)/g;
+  const parts = s.split(regex);
   return parts.map((p, i) => {
+    if (!p) return null;
+    if (/^\$\$[\s\S]+\$\$$/.test(p)) return renderMath(p.slice(2, -2), true, i);
+    if (/^\\\[[\s\S]+\\\]$/.test(p)) return renderMath(p.slice(2, -2), true, i);
+    if (/^\\\([\s\S]+\\\)$/.test(p)) return renderMath(p.slice(2, -2), false, i);
+    if (/^\$[^$\n]+\$$/.test(p)) return renderMath(p.slice(1, -1), false, i);
     if (/^\*\*.+\*\*$/.test(p))
       return (
         <strong key={i} className="font-semibold">
