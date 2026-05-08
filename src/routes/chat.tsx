@@ -1,11 +1,12 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { askHomework } from "@/server/chat.functions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
+import katex from "katex";
 import {
   Sparkles,
   Plus,
@@ -23,6 +24,8 @@ import {
   MicOff,
   Volume2,
   Square,
+  Headphones,
+  PhoneOff,
 } from "lucide-react";
 
 type Subject = "math" | "science" | "english" | "history" | "general";
