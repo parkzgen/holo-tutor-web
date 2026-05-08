@@ -58,12 +58,58 @@ function ChatPage() {
   const [loading, setLoading] = useState(false);
   const [displayName, setDisplayName] = useState<string>("");
   const [listening, setListening] = useState(false);
+  const [convoMode, setConvoMode] = useState(false);
+  const [speakingId, setSpeakingId] = useState<number | null>(null);
   const recognitionRef = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const sendRef = useRef<(text?: string) => Promise<void>>(() => Promise.resolve());
+  const convoModeRef = useRef(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [ttsSupported, setTtsSupported] = useState(false);
 
-  const speechSupported =
-    typeof window !== "undefined" &&
-    !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+  useEffect(() => {
+    setSpeechSupported(
+      !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition),
+    );
+    setTtsSupported("speechSynthesis" in window);
+  }, []);
+
+  useEffect(() => {
+    convoModeRef.current = convoMode;
+  }, [convoMode]);
+
+  const startListening = useCallback((autoSend: boolean) => {
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) return;
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch {}
+    }
+    const rec = new SR();
+    rec.continuous = false;
+    rec.interimResults = true;
+    rec.lang = navigator.language || "en-US";
+    let finalText = "";
+    rec.onstart = () => setListening(true);
+    rec.onend = () => {
+      setListening(false);
+      if (autoSend && finalText.trim()) {
+        sendRef.current(finalText.trim());
+      }
+    };
+    rec.onerror = () => setListening(false);
+    rec.onresult = (e: any) => {
+      let interim = "";
+      finalText = "";
+      for (let i = 0; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) finalText += t;
+        else interim += t;
+      }
+      setInput((finalText + interim).trim());
+    };
+    recognitionRef.current = rec;
+    rec.start();
+  }, []);
 
   function toggleListening() {
     if (!speechSupported) {
@@ -74,22 +120,36 @@ function ChatPage() {
       recognitionRef.current?.stop();
       return;
     }
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    const rec = new SR();
-    rec.continuous = false;
-    rec.interimResults = true;
-    rec.lang = navigator.language || "en-US";
-    let base = input;
-    rec.onstart = () => setListening(true);
-    rec.onend = () => setListening(false);
-    rec.onerror = () => setListening(false);
-    rec.onresult = (e: any) => {
-      let transcript = "";
-      for (let i = 0; i < e.results.length; i++) transcript += e.results[i][0].transcript;
-      setInput((base ? base + " " : "") + transcript);
-    };
-    recognitionRef.current = rec;
-    rec.start();
+    startListening(false);
+  }
+
+  function toggleConvoMode() {
+    if (!speechSupported || !ttsSupported) {
+      toast.error("Voice conversation isn't supported in this browser.");
+      return;
+    }
+    if (convoMode) {
+      setConvoMode(false);
+      try { recognitionRef.current?.stop(); } catch {}
+      window.speechSynthesis.cancel();
+      setSpeakingId(null);
+      return;
+    }
+    setConvoMode(true);
+    toast.success("Conversation mode on — speak when ready.");
+    startListening(true);
+  }
+
+  function speakAssistant(text: string, onDone?: () => void) {
+    if (!ttsSupported) { onDone?.(); return; }
+    const clean = stripForSpeech(text);
+    const u = new SpeechSynthesisUtterance(clean);
+    const id = Date.now();
+    setSpeakingId(id);
+    u.onend = () => { setSpeakingId(null); onDone?.(); };
+    u.onerror = () => { setSpeakingId(null); onDone?.(); };
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(u);
   }
 
 
