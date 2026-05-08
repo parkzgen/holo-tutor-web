@@ -80,23 +80,42 @@ function ChatPage() {
 
   const startListening = useCallback((autoSend: boolean) => {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) return;
+    if (!SR) {
+      toast.error("Speech recognition not supported in this browser.");
+      return;
+    }
     if (recognitionRef.current) {
       try { recognitionRef.current.stop(); } catch {}
+      try { recognitionRef.current.abort?.(); } catch {}
+      recognitionRef.current = null;
     }
     const rec = new SR();
-    rec.continuous = false;
+    rec.continuous = autoSend;
     rec.interimResults = true;
     rec.lang = navigator.language || "en-US";
     let finalText = "";
+    let sent = false;
     rec.onstart = () => setListening(true);
     rec.onend = () => {
       setListening(false);
-      if (autoSend && finalText.trim()) {
+      if (autoSend && !sent && finalText.trim()) {
+        sent = true;
         sendRef.current(finalText.trim());
       }
     };
-    rec.onerror = () => setListening(false);
+    rec.onerror = (e: any) => {
+      setListening(false);
+      const err = e?.error || "unknown";
+      if (err === "not-allowed" || err === "service-not-allowed") {
+        toast.error("Microphone blocked. Allow mic access in your browser settings.");
+      } else if (err === "no-speech") {
+        // silent — let user retry
+      } else if (err === "audio-capture") {
+        toast.error("No microphone detected.");
+      } else if (err !== "aborted") {
+        toast.error(`Voice error: ${err}`);
+      }
+    };
     rec.onresult = (e: any) => {
       let interim = "";
       finalText = "";
@@ -106,26 +125,58 @@ function ChatPage() {
         else interim += t;
       }
       setInput((finalText + interim).trim());
+      // In conversation mode, auto-send shortly after a final result
+      if (autoSend && finalText.trim() && !sent) {
+        sent = true;
+        try { rec.stop(); } catch {}
+      }
     };
     recognitionRef.current = rec;
-    rec.start();
+    try {
+      rec.start();
+    } catch (err: any) {
+      setListening(false);
+      toast.error(`Couldn't start mic: ${err?.message || err}`);
+    }
   }, []);
+
+  async function ensureMicPermission(): Promise<boolean> {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Immediately stop tracks — we only needed the permission prompt
+      stream.getTracks().forEach((t) => t.stop());
+      return true;
+    } catch (err: any) {
+      const name = err?.name || "Error";
+      if (name === "NotAllowedError") {
+        toast.error("Microphone permission denied. Enable it in your browser settings.");
+      } else if (name === "NotFoundError") {
+        toast.error("No microphone found on this device.");
+      } else if (name === "NotReadableError") {
+        toast.error("Microphone is in use by another app.");
+      } else {
+        toast.error(`Microphone error: ${err?.message || name}`);
+      }
+      return false;
+    }
+  }
 
   function toggleListening() {
     if (!speechSupported) {
-      toast.error("Voice input isn't supported in this browser.");
+      toast.error("Voice input isn't supported in this browser. Try Chrome or Edge.");
       return;
     }
     if (listening) {
-      recognitionRef.current?.stop();
+      try { recognitionRef.current?.stop(); } catch {}
       return;
     }
+    // Start synchronously to preserve user-gesture context
     startListening(false);
   }
 
-  function toggleConvoMode() {
+  async function toggleConvoMode() {
     if (!speechSupported || !ttsSupported) {
-      toast.error("Voice conversation isn't supported in this browser.");
+      toast.error("Voice conversation isn't supported in this browser. Try Chrome or Edge.");
       return;
     }
     if (convoMode) {
@@ -135,6 +186,9 @@ function ChatPage() {
       setSpeakingId(null);
       return;
     }
+    // Pre-prompt mic permission once before entering convo mode
+    const ok = await ensureMicPermission();
+    if (!ok) return;
     setConvoMode(true);
     toast.success("Conversation mode on — speak when ready.");
     startListening(true);
