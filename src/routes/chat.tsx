@@ -516,7 +516,7 @@ function ChatPage() {
                 maxLength={4000}
                 className="min-h-[44px] max-h-40 resize-none border-0 bg-transparent focus-visible:ring-0"
               />
-              {speechSupported && (
+              {mounted && speechSupported && (
                 <Button
                   onClick={toggleListening}
                   disabled={loading}
