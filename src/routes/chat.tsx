@@ -1,4 +1,4 @@
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { askHomework } from "@/server/chat.functions";
@@ -26,6 +26,7 @@ import {
   Square,
   Headphones,
   PhoneOff,
+  ListTodo,
 } from "lucide-react";
 
 type Subject = "math" | "science" | "english" | "history" | "general";
@@ -430,7 +431,14 @@ function ChatPage() {
             ))}
           </ul>
         </ScrollArea>
-        <div className="border-t border-border px-3 py-3">
+        <div className="border-t border-border px-3 py-3 space-y-2">
+          <Link
+            to="/planner"
+            className="flex items-center gap-2 rounded-md px-2 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition"
+          >
+            <ListTodo className="h-4 w-4" />
+            Study planner
+          </Link>
           <div className="flex items-center justify-between gap-2 px-2 text-sm">
             <span className="truncate text-muted-foreground">{displayName}</span>
             <Button variant="ghost" size="icon" onClick={logout} title="Sign out">
