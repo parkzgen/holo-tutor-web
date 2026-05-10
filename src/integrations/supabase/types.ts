@@ -100,6 +100,48 @@ export type Database = {
         }
         Relationships: []
       }
+      study_tasks: {
+        Row: {
+          completed: boolean
+          completed_at: string | null
+          created_at: string
+          due_date: string | null
+          id: string
+          notes: string | null
+          priority: string
+          subject: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          priority?: string
+          subject?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          priority?: string
+          subject?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
