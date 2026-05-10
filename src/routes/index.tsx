@@ -1,8 +1,7 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Sparkles, BookOpen, Calculator, FlaskConical, Landmark, ShieldAlert } from "lucide-react";
+import "@/styles/landing.css";
 
 export const Route = createFileRoute("/")({
   beforeLoad: async () => {
@@ -13,101 +12,98 @@ export const Route = createFileRoute("/")({
   component: Landing,
 });
 
+/* ------------------------------------------------------------------
+   This page is intentionally written as plain HTML + a CSS file
+   (src/styles/landing.css). No Tailwind, no UI component imports.
+   Edit the markup below or the CSS file directly to restyle.
+   The only React bits are the auth redirect (above) and a tiny
+   one-time effect that toggles the `is-visible` class for fade-in.
+   ------------------------------------------------------------------ */
 function Landing() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+  const v = mounted ? "fade-in is-visible" : "fade-in";
 
   return (
-    <main className="relative min-h-screen overflow-hidden">
-      {/* grid backdrop */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.07]"
-        style={{
-          backgroundImage:
-            "linear-gradient(var(--foreground) 1px, transparent 1px), linear-gradient(90deg, var(--foreground) 1px, transparent 1px)",
-          backgroundSize: "44px 44px",
-          maskImage: "radial-gradient(ellipse at center, black 40%, transparent 75%)",
-        }}
-      />
+    <main className="landing">
+      <div className="landing-grid" aria-hidden="true"></div>
 
-      <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
-        <Link to="/" className="flex items-center gap-2 font-display text-lg font-semibold">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-accent glow">
-            <Sparkles className="h-4 w-4 text-primary-foreground" />
+      <header className="landing-header">
+        <a href="/" className="landing-logo">
+          <span className="landing-logo-mark">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>
+            </svg>
           </span>
           <span>Synaptic</span>
-        </Link>
-        <div className="flex items-center gap-2">
-          <Button asChild variant="ghost">
-            <Link to="/login">Sign in</Link>
-          </Button>
-          <Button asChild>
-            <Link to="/login" search={{ mode: "signup" }}>Get started</Link>
-          </Button>
-        </div>
+        </a>
+
+        <nav className="landing-nav">
+          <a href="/login" className="btn btn-ghost">Sign in</a>
+          <a href="/login?mode=signup" className="btn btn-primary">Get started</a>
+        </nav>
       </header>
 
-      <section className="relative z-10 mx-auto max-w-4xl px-6 pt-16 pb-24 text-center">
-        <div
-          className={`inline-flex items-center gap-2 rounded-full border border-border bg-card/50 px-3 py-1 text-xs text-muted-foreground transition-all duration-700 ${
-            mounted ? "opacity-100" : "opacity-0 -translate-y-2"
-          }`}
-        >
-          <span className="h-1.5 w-1.5 rounded-full bg-primary glow" />
+      <section className="hero">
+        <div className={`hero-pill ${v}`}>
+          <span className="hero-pill-dot"></span>
           AI tutor that helps you learn — not cheat
         </div>
-        <h1
-          className={`mt-6 text-5xl font-bold leading-tight tracking-tight md:text-7xl transition-all duration-700 ${
-            mounted ? "opacity-100" : "opacity-0 translate-y-3"
-          }`}
-        >
-          Homework, <span className="text-gradient">decoded</span>.
+
+        <h1 className={`hero-title ${v}`}>
+          Homework, <span className="accent">decoded</span>.
         </h1>
-        <p
-          className={`mx-auto mt-6 max-w-xl text-lg text-muted-foreground transition-all duration-700 delay-100 ${
-            mounted ? "opacity-100" : "opacity-0 translate-y-3"
-          }`}
-        >
-          Ask questions across Math, Science, English, and History. Get clear, step-by-step
-          explanations from a futuristic AI tutor designed for curious students.
+
+        <p className={`hero-sub ${v} delay-1`}>
+          Ask questions across Math, Science, English, and History. Get clear,
+          step-by-step explanations from a futuristic AI tutor designed for
+          curious students.
         </p>
-        <div
-          className={`mt-10 flex items-center justify-center gap-3 transition-all duration-700 delay-200 ${
-            mounted ? "opacity-100" : "opacity-0 translate-y-3"
-          }`}
-        >
-          <Button asChild size="lg" className="glow">
-            <Link to="/login" search={{ mode: "signup" }}>Start learning free</Link>
-          </Button>
-          <Button asChild size="lg" variant="outline">
-            <Link to="/login">I have an account</Link>
-          </Button>
+
+        <div className={`hero-actions ${v} delay-2`}>
+          <a href="/login?mode=signup" className="btn btn-primary btn-lg btn-glow">
+            Start learning free
+          </a>
+          <a href="/login" className="btn btn-outline btn-lg">
+            I have an account
+          </a>
         </div>
 
-        <div className="mx-auto mt-16 grid max-w-3xl grid-cols-2 gap-3 md:grid-cols-4">
-          {[
-            { icon: Calculator, label: "Math", color: "var(--math)" },
-            { icon: FlaskConical, label: "Science", color: "var(--science)" },
-            { icon: BookOpen, label: "English", color: "var(--english)" },
-            { icon: Landmark, label: "History", color: "var(--history)" },
-          ].map((s) => (
-            <div
-              key={s.label}
-              className="glass flex flex-col items-center gap-2 rounded-xl p-4 transition-transform hover:-translate-y-1"
-            >
-              <s.icon className="h-6 w-6" style={{ color: s.color }} />
-              <span className="text-sm font-medium">{s.label}</span>
-            </div>
-          ))}
+        <div className="subjects">
+          <div className="subject-card">
+            <svg className="subject-icon" viewBox="0 0 24 24" fill="none" stroke="var(--math)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/>
+            </svg>
+            <span className="subject-label">Math</span>
+          </div>
+          <div className="subject-card">
+            <svg className="subject-icon" viewBox="0 0 24 24" fill="none" stroke="var(--science)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M10 2v7.31"/><path d="M14 9.3V1.99"/><path d="M8.5 2h7"/><path d="M14 9.3a6.5 6.5 0 1 1-4 0"/>
+            </svg>
+            <span className="subject-label">Science</span>
+          </div>
+          <div className="subject-card">
+            <svg className="subject-icon" viewBox="0 0 24 24" fill="none" stroke="var(--english)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
+            </svg>
+            <span className="subject-label">English</span>
+          </div>
+          <div className="subject-card">
+            <svg className="subject-icon" viewBox="0 0 24 24" fill="none" stroke="var(--history)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/>
+            </svg>
+            <span className="subject-label">History</span>
+          </div>
         </div>
 
-        <div className="mx-auto mt-12 flex max-w-2xl items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-left text-sm text-amber-200/90">
-          <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
+        <div className="honesty">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4"/><path d="M12 16h.01"/>
+          </svg>
           <p>
-            <strong className="font-semibold">Learn, don't cheat.</strong> Synaptic is built to
-            explain, guide, and tutor. Submitting AI-written answers as your own may violate your
-            school's academic honesty policy.
+            <strong>Learn, don't cheat.</strong> Synaptic is built to explain,
+            guide, and tutor. Submitting AI-written answers as your own may
+            violate your school's academic honesty policy.
           </p>
         </div>
       </section>
