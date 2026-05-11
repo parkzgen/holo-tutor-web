@@ -27,8 +27,8 @@ export const askHomework = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => inputSchema.parse(input))
   .handler(async ({ data }) => {
-    const LOVABLE_API_KEY = process.env.LOVABLE_API_KEY;
-    if (!LOVABLE_API_KEY) {
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    if (!GEMINI_API_KEY) {
       return { content: "", error: "AI is not configured. Please contact support." };
     }
 
@@ -45,27 +45,27 @@ Subject focus: ${data.subject.toUpperCase()}
 ${SUBJECT_GUIDANCE[data.subject]}`;
 
     try {
-      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${GEMINI_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "gemini-2.5-flash",
+            messages: [{ role: "system", content: systemPrompt }, ...data.messages],
+          }),
         },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [{ role: "system", content: systemPrompt }, ...data.messages],
-        }),
-      });
+      );
 
       if (res.status === 429) {
         return { content: "", error: "Too many requests right now. Please try again in a moment." };
       }
-      if (res.status === 402) {
-        return { content: "", error: "AI credits exhausted. Please add credits in your workspace." };
-      }
       if (!res.ok) {
         const text = await res.text();
-        console.error("AI gateway error", res.status, text);
+        console.error("Gemini API error", res.status, text);
         return { content: "", error: "The AI tutor couldn't respond. Please try again." };
       }
 
